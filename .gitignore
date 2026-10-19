@@ -1,0 +1,15 @@
+node_modules/
+dist/
+src-tauri/target/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.local
+docs/app-shots/*.png
+!docs/figma-refs/
+src-tauri/icons/icon-256.png

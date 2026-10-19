@@ -1,0 +1,44 @@
+:root {
+  --bg-0: #e5e0d5;
+  --bg-1: #f5f1e8;
+  --color-raised: #faf7f0;
+  --color-shell: #d9d3c6;
+  --color-highlight: #ffffff;
+  --color-accentSoft: #d5e5dc;
+  --ink: #292f2d;
+  --ink-dim: #62665f;
+  --ink-mute: #73776e;
+  --line: #cbc8bc;
+  --line-strong: #b7b3a6;
+  --accent: #176c5b;
+  --accent-2: #366f9d;
+  --color-cpu: #217c68;
+  --color-memory: #427cac;
+  --color-disk: #b48736;
+  --color-network: #667d96;
+  --color-track: #d5d7ca;
+  --danger: #b54a4a;
+  --warn: #b48736;
+  --ok: #176c5b;
+  --glass: rgba(250, 247, 240, 0.72);
+  --glass-strong: rgba(250, 247, 240, 0.88);
+  --radius-4: 4px;
+  --radius-8: 8px;
+  --radius-12: 12px;
+  --radius-16: 16px;
+  --radius: var(--radius-16);
+  --radius-sm: var(--radius-12);
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --font: "IBM Plex Sans", "Segoe UI Variable", "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", "Cascadia Mono", ui-monospace, monospace;
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --shadow: 0 12px 32px rgba(41, 47, 45, 0.07);
+  /* Authorized gradient accents (beyond Figma solid fills) */
+  --grad-nav-active: linear-gradient(90deg, #d5e5dc 0%, #e8f1f4 100%);
+  --grad-primary: linear-gradient(135deg, #176c5b 0%, #176c5b 78%, #366f9d 100%);
+  --grad-reclaim: linear-gradient(90deg, #f3e0c0 0%, #f6d4c2 100%);
+  color-scheme: light;
+}
