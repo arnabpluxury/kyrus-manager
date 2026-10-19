@@ -69,8 +69,20 @@ const NAV: { id: ViewId; label: string; group: string; icon: IconName }[] = [
   { id: "control", label: "Control Center", group: "System", icon: "control" },
 ];
 
+function initialView(): ViewId {
+  try {
+    const q = new URLSearchParams(window.location.search).get("view");
+    if (q && NAV.some((n) => n.id === q)) return q as ViewId;
+    const stored = sessionStorage.getItem("kyrus.view");
+    if (stored && NAV.some((n) => n.id === stored)) return stored as ViewId;
+  } catch {
+    /* ignore */
+  }
+  return "overview";
+}
+
 export default function App() {
-  const [view, setView] = useState<ViewId>("overview");
+  const [view, setView] = useState<ViewId>(initialView);
   const [admin, setAdmin] = useState<AdminStatus | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [clock, setClock] = useState(() => new Date());
@@ -85,6 +97,23 @@ export default function App() {
   useEffect(() => {
     api.adminStatus().then(setAdmin).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    api
+      .bootView()
+      .then((v) => {
+        if (v && NAV.some((n) => n.id === v)) setView(v as ViewId);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem("kyrus.view", view);
+    } catch {
+      /* ignore */
+    }
+  }, [view]);
 
   useEffect(() => {
     const id = window.setInterval(() => setClock(new Date()), 1000);

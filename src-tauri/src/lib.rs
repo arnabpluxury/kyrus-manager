@@ -30,6 +30,23 @@ fn get_admin_status() -> AdminStatus {
     admin::status()
 }
 
+/// One-shot view deep-link for screenshots / automation (`%TEMP%\kyrus-next-view.txt`).
+#[tauri::command]
+fn take_boot_view() -> Option<String> {
+    let path = std::env::temp_dir().join("kyrus-next-view.txt");
+    if !path.exists() {
+        return None;
+    }
+    let raw = std::fs::read_to_string(&path).ok()?;
+    let _ = std::fs::remove_file(&path);
+    let v = raw.trim().to_string();
+    if v.is_empty() {
+        None
+    } else {
+        Some(v)
+    }
+}
+
 #[tauri::command]
 fn relaunch_admin() -> Result<(), String> {
     admin::relaunch_as_admin()
@@ -419,6 +436,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_admin_status,
+            take_boot_view,
             relaunch_admin,
             list_drives,
             scan_storage,

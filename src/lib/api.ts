@@ -32,6 +32,7 @@ import type {
 
 export const api = {
   adminStatus: () => invoke<AdminStatus>("get_admin_status"),
+  bootView: () => invoke<string | null>("take_boot_view"),
   relaunchAdmin: () => invoke<void>("relaunch_admin"),
   drives: () => invoke<DriveInfo[]>("list_drives"),
   scanStorage: (options: Record<string, unknown>) =>
