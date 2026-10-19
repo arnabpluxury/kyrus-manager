@@ -10,6 +10,10 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/arnabpluxury/kyrus-manager/stargazers"><img src="https://img.shields.io/github/stars/arnabpluxury/kyrus-manager?style=flat-square&label=stars&color=176c5b" alt="stars" /></a>
+  <a href="https://github.com/arnabpluxury/kyrus-manager/network/members"><img src="https://img.shields.io/github/forks/arnabpluxury/kyrus-manager?style=flat-square&label=forks&color=366f9d" alt="forks" /></a>
+  <a href="https://github.com/arnabpluxury/kyrus-manager/watchers"><img src="https://img.shields.io/github/watchers/arnabpluxury/kyrus-manager?style=flat-square&label=watchers&color=b48736" alt="watchers" /></a>
+  <a href="https://github.com/arnabpluxury/kyrus-manager/issues"><img src="https://img.shields.io/github/issues/arnabpluxury/kyrus-manager?style=flat-square&label=issues&color=b54a4a" alt="issues" /></a>
   <a href="https://github.com/arnabpluxury/kyrus-manager/releases/latest"><img src="https://img.shields.io/github/v/release/arnabpluxury/kyrus-manager?style=flat-square&label=release&color=176c5b" alt="release" /></a>
   <a href="https://github.com/arnabpluxury/kyrus-manager/releases"><img src="https://img.shields.io/github/downloads/arnabpluxury/kyrus-manager/total?style=flat-square&color=366f9d" alt="downloads" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Open%20Contribution-292f2d?style=flat-square" alt="license" /></a>
@@ -123,6 +127,38 @@ npm run tauri:build:fresh
 ```
 
 Requires Node 20+, Rust, Windows 10/11, and WebView2.
+
+## Project pulse
+
+These charts update automatically as stars, commits, and traffic change.
+
+<p align="center">
+  <a href="https://star-history.com/#arnabpluxury/kyrus-manager&Date">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=arnabpluxury/kyrus-manager&type=Date&theme=dark" />
+      <img src="https://api.star-history.com/chart?repos=arnabpluxury/kyrus-manager&type=Date" alt="Star history" width="820" />
+    </picture>
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/arnabpluxury/kyrus-manager">
+    <img src="https://github-readme-stats.vercel.app/api/pin/?username=arnabpluxury&repo=kyrus-manager&theme=default&hide_border=true&bg_color=f5f1e8&title_color=176c5b&icon_color=366f9d&text_color=292f2d" alt="Repo card" />
+  </a>
+  <a href="https://github.com/arnabpluxury">
+    <img src="https://github-readme-stats.vercel.app/api?username=arnabpluxury&show_icons=true&theme=default&hide_border=true&bg_color=f5f1e8&title_color=176c5b&icon_color=366f9d&text_color=292f2d&include_all_commits=true" alt="GitHub stats" height="165" />
+  </a>
+</p>
+
+<p align="center">
+  <img src="https://github-readme-stats.vercel.app/api/top-langs/?username=arnabpluxury&layout=compact&theme=default&hide_border=true&bg_color=f5f1e8&title_color=176c5b&text_color=292f2d" alt="Top languages" />
+</p>
+
+<p align="center">
+  <a href="https://starchart.cc/arnabpluxury/kyrus-manager">
+    <img src="https://starchart.cc/arnabpluxury/kyrus-manager.svg" alt="Starchart" width="820" />
+  </a>
+</p>
 
 ## Support
 
