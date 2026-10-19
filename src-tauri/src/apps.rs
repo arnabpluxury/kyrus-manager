@@ -22,6 +22,16 @@ fn read_dword(key: &RegKey, name: &str) -> Option<u32> {
 use std::os::windows::ffi::OsStrExt;
 
 #[cfg(windows)]
+pub(crate) fn extract_icon_base64_pub(path: &str) -> Option<String> {
+    extract_icon_base64(path)
+}
+
+#[cfg(not(windows))]
+pub(crate) fn extract_icon_base64_pub(_path: &str) -> Option<String> {
+    None
+}
+
+#[cfg(windows)]
 fn extract_icon_base64(path: &str) -> Option<String> {
     use windows::Win32::Graphics::Gdi::{
         CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits,
@@ -165,15 +175,21 @@ fn push_app(
     let uninstall_string = read_string(key, "UninstallString");
     let quiet = read_string(key, "QuietUninstallString");
     let display_icon = read_string(key, "DisplayIcon");
-    let icon_base64 =
+    let install_location = read_string(key, "InstallLocation");
+    let mut icon_base64 =
         icon_from_display_or_uninstall(display_icon.as_deref(), uninstall_string.as_deref());
+    if icon_base64.is_none() {
+        if let Some(loc) = install_location.as_deref() {
+            icon_base64 = icon_from_install_dir(loc);
+        }
+    }
     out.push(InstalledApp {
         id,
         name: display_name,
         publisher: read_string(key, "Publisher"),
         version: read_string(key, "DisplayVersion"),
         install_date: read_string(key, "InstallDate"),
-        install_location: read_string(key, "InstallLocation"),
+        install_location,
         uninstall_string,
         quiet_uninstall_string: quiet,
         estimated_size_bytes: read_dword(key, "EstimatedSize").map(|kb| kb as u64 * 1024),
@@ -181,6 +197,46 @@ fn push_app(
         source: "Registry".into(),
         architecture: arch.into(),
     });
+}
+
+fn icon_from_install_dir(dir: &str) -> Option<String> {
+    let root = Path::new(dir);
+    if !root.is_dir() {
+        return None;
+    }
+    let mut candidates: Vec<std::path::PathBuf> = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(root) {
+        for e in rd.flatten() {
+            let p = e.path();
+            let ext = p
+                .extension()
+                .and_then(|x| x.to_str())
+                .unwrap_or("")
+                .to_lowercase();
+            if ext == "exe" || ext == "ico" {
+                candidates.push(p);
+            }
+        }
+    }
+    candidates.sort_by_key(|p| {
+        let name = p
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        // Prefer main-looking binaries over uninstallers
+        if name.contains("uninstall") || name.contains("setup") || name.contains("update") {
+            2
+        } else {
+            0
+        }
+    });
+    for p in candidates.into_iter().take(6) {
+        if let Some(icon) = extract_icon_base64(&p.to_string_lossy()) {
+            return Some(icon);
+        }
+    }
+    None
 }
 
 pub fn list_installed_apps() -> Vec<InstalledApp> {

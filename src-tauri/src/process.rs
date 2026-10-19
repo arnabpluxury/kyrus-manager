@@ -69,6 +69,33 @@ pub fn kill_processes(pids: Vec<u32>) -> Vec<(u32, Result<(), String>)> {
         .collect()
 }
 
+/// End process and children (Task Manager "End process tree").
+pub fn kill_process_tree(pid: u32) -> Result<(), String> {
+    let status = crate::shellutil::status_hidden(
+        "taskkill",
+        &["/PID", &pid.to_string(), "/T", "/F"],
+    )?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err("taskkill /T failed (access denied or process protected)".into())
+    }
+}
+
+pub fn suspend_process(pid: u32) -> Result<(), String> {
+    crate::shellutil::powershell_json(&format!(
+        "Suspend-Process -Id {pid} -ErrorAction Stop; 'ok'"
+    ))
+    .map(|_| ())
+}
+
+pub fn resume_process(pid: u32) -> Result<(), String> {
+    crate::shellutil::powershell_json(&format!(
+        "Resume-Process -Id {pid} -ErrorAction Stop; 'ok'"
+    ))
+    .map(|_| ())
+}
+
 #[cfg(windows)]
 pub fn set_priority(pid: u32, class: &str) -> Result<(), String> {
     use windows::Win32::Foundation::CloseHandle;

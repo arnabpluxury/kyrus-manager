@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
+import { useBusy } from "../lib/busy";
 import { formatBytes } from "../lib/format";
 import type { DriveInfo, TreemapNode } from "../types";
 import { Button } from "../components/Button";
@@ -44,6 +45,7 @@ export default function TreemapView({ notify }: Props) {
   const [tree, setTree] = useState<TreemapNode | null>(null);
   const [stack, setStack] = useState<string[]>(["C:\\"]);
   const [loading, setLoading] = useState(false);
+  const busy = useBusy();
 
   useEffect(() => {
     api.drives().then((d) => {
@@ -56,7 +58,9 @@ export default function TreemapView({ notify }: Props) {
   }, []);
 
   const load = async (path: string) => {
+    if (loading) return;
     setLoading(true);
+    busy.begin("treemap", "Building treemap");
     try {
       const node = await api.treemap(path, 28, 2);
       setTree(node);
@@ -64,6 +68,7 @@ export default function TreemapView({ notify }: Props) {
     } catch (e) {
       notify(String(e));
     } finally {
+      busy.end("treemap");
       setLoading(false);
     }
   };

@@ -76,11 +76,45 @@ export default function ProcessesView({ notify }: Props) {
     notify("End task requested");
   };
 
+  const endTrees = async () => {
+    const pids = [...selected];
+    if (!pids.length) return;
+    const ok = await ask({
+      title: "End process tree",
+      message: `End ${pids.length} process tree(s) including child processes? Same as Task Manager “End process tree”.`,
+      confirmLabel: "End tree",
+    });
+    if (!ok) return;
+    for (const pid of pids) {
+      try {
+        await api.killProcessTree(pid);
+      } catch (e) {
+        notify(`${pid}: ${String(e)}`);
+      }
+    }
+    setSelected(new Set());
+    notify("End process tree requested");
+  };
+
+  const suspendSelected = async (resume = false) => {
+    const pids = [...selected];
+    if (!pids.length) return;
+    for (const pid of pids) {
+      try {
+        if (resume) await api.resumeProcess(pid);
+        else await api.suspendProcess(pid);
+      } catch (e) {
+        notify(`${pid}: ${String(e)}`);
+      }
+    }
+    notify(resume ? "Resume requested" : "Suspend requested");
+  };
+
   return (
     <div className="view">
       <ViewHead
         title="Processes"
-        subtitle="Task Manager replacement — live CPU, memory, disk I/O, paths, and admin kill controls."
+        subtitle="Task Manager replacement — CPU, memory, disk I/O, priority, suspend/resume, end task & process tree. Paths always visible."
       >
         <Field label="Search">
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Name or PID" />
@@ -92,8 +126,17 @@ export default function ProcessesView({ notify }: Props) {
             <option value="name">Name</option>
           </select>
         </Field>
+        <Button onClick={() => suspendSelected(false)} disabled={!selected.size}>
+          Suspend
+        </Button>
+        <Button onClick={() => suspendSelected(true)} disabled={!selected.size}>
+          Resume
+        </Button>
         <Button variant="danger" onClick={endTasks} disabled={!selected.size}>
           End task
+        </Button>
+        <Button variant="danger" onClick={endTrees} disabled={!selected.size}>
+          End tree
         </Button>
       </ViewHead>
 
@@ -132,7 +175,22 @@ export default function ProcessesView({ notify }: Props) {
                     {formatBytes(p.diskReadBytes)} / {formatBytes(p.diskWriteBytes)}
                   </td>
                   <td>{p.status}</td>
-                  <td className="path mono">{p.path ?? "—"}</td>
+                  <td className="path mono">
+                    {p.path ? (
+                      <button
+                        type="button"
+                        className="linkish"
+                        title="Reveal in Explorer"
+                        onClick={() =>
+                          api.revealInExplorer(p.path!).then(notify).catch((e) => notify(String(e)))
+                        }
+                      >
+                        {p.path}
+                      </button>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td>
                     <select
                       className="priority-select"
@@ -149,6 +207,7 @@ export default function ProcessesView({ notify }: Props) {
                       <option value="normal">Normal</option>
                       <option value="above_normal">Above</option>
                       <option value="high">High</option>
+                      <option value="realtime">Realtime</option>
                     </select>
                   </td>
                 </tr>

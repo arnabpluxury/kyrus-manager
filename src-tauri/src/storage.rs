@@ -1,8 +1,9 @@
 use crate::models::{DriveInfo, ScanOptions, StorageEntry, StorageScanResult};
+use crate::progress::ProgressEmitter;
 use rayon::prelude::*;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::time::Instant;
 use walkdir::{DirEntry, WalkDir};
 
@@ -267,6 +268,13 @@ pub fn path_size(path: &str) -> u64 {
 }
 
 pub fn scan_storage(options: ScanOptions) -> Result<StorageScanResult, String> {
+    scan_storage_with_progress(options, None)
+}
+
+pub fn scan_storage_with_progress(
+    options: ScanOptions,
+    progress: Option<&ProgressEmitter>,
+) -> Result<StorageScanResult, String> {
     let root = PathBuf::from(&options.root);
     if !root.exists() {
         return Err(format!("Path does not exist: {}", options.root));
@@ -292,6 +300,12 @@ pub fn scan_storage(options: ScanOptions) -> Result<StorageScanResult, String> {
 
     let started = Instant::now();
     let denied = AtomicU64::new(0);
+    let bytes_so_far = AtomicU64::new(0);
+    let done = AtomicUsize::new(0);
+
+    if let Some(p) = progress {
+        p.emit("listing", &options.root, 0, 0, 0, true);
+    }
 
     let children: Vec<PathBuf> = if root.is_file() {
         vec![root.clone()]
@@ -312,13 +326,33 @@ pub fn scan_storage(options: ScanOptions) -> Result<StorageScanResult, String> {
         list
     };
 
+    let total = children.len() as u64;
+    if let Some(p) = progress {
+        p.emit(
+            "sizing",
+            &format!("Measuring {total} items under {}", options.root),
+            0,
+            total,
+            0,
+            true,
+        );
+    }
+
     let mut entries: Vec<StorageEntry> = children
         .par_iter()
         .filter_map(|path| {
+            let label = path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| path.to_string_lossy().to_string());
             let meta = match fs::metadata(path) {
                 Ok(m) => m,
                 Err(_) => {
                     denied.fetch_add(1, Ordering::Relaxed);
+                    let n = done.fetch_add(1, Ordering::Relaxed) as u64 + 1;
+                    if let Some(p) = progress {
+                        p.emit("sizing", &label, n, total, bytes_so_far.load(Ordering::Relaxed), false);
+                    }
                     return None;
                 }
             };
@@ -341,6 +375,18 @@ pub fn scan_storage(options: ScanOptions) -> Result<StorageScanResult, String> {
             } else {
                 meta.len()
             };
+            bytes_so_far.fetch_add(size, Ordering::Relaxed);
+            let n = done.fetch_add(1, Ordering::Relaxed) as u64 + 1;
+            if let Some(p) = progress {
+                p.emit(
+                    "sizing",
+                    &label,
+                    n,
+                    total,
+                    bytes_so_far.load(Ordering::Relaxed),
+                    n == total,
+                );
+            }
             if size < min_size {
                 return None;
             }
@@ -411,6 +457,14 @@ pub fn scan_storage(options: ScanOptions) -> Result<StorageScanResult, String> {
     let drive_free_bytes = drive.as_ref().map(|d| d.free_bytes);
     let unaccounted_bytes = drive_used_bytes.map(|used| used.saturating_sub(total_scanned_bytes));
 
+    if let Some(p) = progress {
+        p.finish(&format!(
+            "{} items · {}",
+            entries.len(),
+            format_bytes_short(total_scanned_bytes)
+        ));
+    }
+
     Ok(StorageScanResult {
         root: options.root,
         entries,
@@ -428,6 +482,22 @@ pub fn scan_storage(options: ScanOptions) -> Result<StorageScanResult, String> {
     })
 }
 
+fn format_bytes_short(n: u64) -> String {
+    const KB: f64 = 1024.0;
+    const MB: f64 = KB * 1024.0;
+    const GB: f64 = MB * 1024.0;
+    let v = n as f64;
+    if v >= GB {
+        format!("{:.1} GB", v / GB)
+    } else if v >= MB {
+        format!("{:.0} MB", v / MB)
+    } else if v >= KB {
+        format!("{:.0} KB", v / KB)
+    } else {
+        format!("{n} B")
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LargeFile {
@@ -440,11 +510,25 @@ pub struct LargeFile {
 
 /// Walk an entire tree and return the largest files (not folders).
 pub fn find_largest_files(root: &str, limit: usize, min_size_bytes: u64) -> Result<Vec<LargeFile>, String> {
+    find_largest_files_with_progress(root, limit, min_size_bytes, None)
+}
+
+pub fn find_largest_files_with_progress(
+    root: &str,
+    limit: usize,
+    min_size_bytes: u64,
+    progress: Option<&ProgressEmitter>,
+) -> Result<Vec<LargeFile>, String> {
     let path = PathBuf::from(root);
     if !path.exists() {
         return Err(format!("Path does not exist: {root}"));
     }
+    if let Some(p) = progress {
+        p.emit("walking", root, 0, 0, 0, true);
+    }
     let mut files: Vec<LargeFile> = Vec::new();
+    let mut visited = 0u64;
+    let mut bytes = 0u64;
     for entry in WalkDir::new(&path).follow_links(false).into_iter().filter_map(|e| e.ok()) {
         if !entry.file_type().is_file() {
             continue;
@@ -454,39 +538,85 @@ pub fn find_largest_files(root: &str, limit: usize, min_size_bytes: u64) -> Resu
         }
         let Ok(meta) = entry.metadata() else { continue };
         let size = meta.len();
+        visited += 1;
+        bytes = bytes.saturating_add(size);
+        if visited % 400 == 0 {
+            if let Some(p) = progress {
+                let name = entry
+                    .path()
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                p.emit("walking", &name, visited, 0, bytes, false);
+            }
+        }
         if size < min_size_bytes {
             continue;
         }
-        let p = entry.path();
+        let pth = entry.path();
         files.push(LargeFile {
-            path: p.to_string_lossy().to_string(),
-            name: p
+            path: pth.to_string_lossy().to_string(),
+            name: pth
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_default(),
             size_bytes: size,
-            category: categorize(p, false),
-            extension: p.extension().and_then(|e| e.to_str()).map(|s| s.to_lowercase()),
+            category: categorize(pth, false),
+            extension: pth.extension().and_then(|e| e.to_str()).map(|s| s.to_lowercase()),
         });
+        // Keep only top candidates to bound memory
+        if files.len() > limit * 4 {
+            files.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+            files.truncate(limit * 2);
+        }
     }
     files.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
     files.truncate(limit.max(1));
+    if let Some(p) = progress {
+        p.finish(&format!("{} large files", files.len()));
+    }
     Ok(files)
 }
 
 pub fn delete_paths(paths: Vec<String>) -> crate::models::DeleteResult {
+    delete_paths_with_progress(paths, None)
+}
+
+pub fn delete_paths_with_progress(
+    paths: Vec<String>,
+    progress: Option<&crate::progress::ProgressEmitter>,
+) -> crate::models::DeleteResult {
     use crate::models::{DeleteFailure, DeleteResult};
     let mut deleted = Vec::new();
     let mut failed = Vec::new();
     let mut freed = 0u64;
+    let total = paths.len() as u64;
 
-    for path in paths {
+    if let Some(p) = progress {
+        p.emit("deleting", "Preparing removal…", 0, total, 0, true);
+    }
+
+    for (i, path) in paths.into_iter().enumerate() {
+        let label = Path::new(&path)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| path.clone());
+        if let Some(p) = progress {
+            p.emit(
+                "deleting",
+                &label,
+                i as u64,
+                total,
+                freed,
+                i as u64 + 1 == total,
+            );
+        }
         let size = path_size(&path);
-        let p = Path::new(&path);
-        let result = if p.is_dir() {
-            fs::remove_dir_all(p)
+        let pth = Path::new(&path);
+        let result = if pth.is_dir() {
+            fs::remove_dir_all(pth)
         } else {
-            fs::remove_file(p)
+            fs::remove_file(pth)
         };
         match result {
             Ok(()) => {
@@ -498,6 +628,15 @@ pub fn delete_paths(paths: Vec<String>) -> crate::models::DeleteResult {
                 error: e.to_string(),
             }),
         }
+    }
+
+    if let Some(p) = progress {
+        p.finish(&format!(
+            "Removed {} · failed {} · freed {}",
+            deleted.len(),
+            failed.len(),
+            format_bytes_short(freed)
+        ));
     }
 
     DeleteResult {

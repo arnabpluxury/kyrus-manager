@@ -1,8 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AdminStatus,
+  BloatScanResult,
   ControlAction,
+  DeviceEntry,
+  DiskInventory,
   DriveInfo,
+  EventLogEntry,
   FirewallProfile,
   FirewallRule,
   GpuInfo,
@@ -20,6 +24,7 @@ import type {
   SpacePrediction,
   StartupItem,
   StorageScanResult,
+  SystemAbout,
   TempCandidate,
   TreemapNode,
   UserSession,
@@ -96,4 +101,32 @@ export const api = {
     invoke<{ adapter: string; details: string }[]>("ipconfig_all"),
   userSessions: () => invoke<UserSession[]>("list_user_sessions"),
   localUsers: () => invoke<string[]>("list_local_users"),
+  killProcessTree: (pid: number) => invoke<void>("kill_process_tree", { pid }),
+  suspendProcess: (pid: number) => invoke<void>("suspend_process", { pid }),
+  resumeProcess: (pid: number) => invoke<void>("resume_process", { pid }),
+  diskInventory: () => invoke<DiskInventory>("disk_inventory"),
+  setDiskOnline: (number: number, online: boolean) =>
+    invoke<string>("set_disk_online", { number, online }),
+  setDiskReadonly: (number: number, readOnly: boolean) =>
+    invoke<string>("set_disk_readonly", { number, readOnly }),
+  devices: (className?: string) =>
+    invoke<DeviceEntry[]>("list_devices", { class: className ?? null }),
+  setDeviceEnabled: (instanceId: string, enable: boolean) =>
+    invoke<string>("set_device_enabled", { instanceId, enable }),
+  systemAbout: () => invoke<SystemAbout>("system_about"),
+  eventLog: (log = "System", limit = 120, level?: string) =>
+    invoke<EventLogEntry[]>("list_event_log", { log, limit, level: level ?? null }),
+  setAdapterEnabled: (name: string, enable: boolean) =>
+    invoke<string>("set_adapter_enabled", { name, enable }),
+  rescanDisks: () => invoke<string>("rescan_disks"),
+  assignDriveLetter: (diskNumber: number, partitionNumber: number, letter: string) =>
+    invoke<string>("assign_drive_letter", { diskNumber, partitionNumber, letter }),
+  removeDriveLetter: (diskNumber: number, partitionNumber: number) =>
+    invoke<string>("remove_drive_letter", { diskNumber, partitionNumber }),
+  initializeDisk: (number: number, style?: string) =>
+    invoke<string>("initialize_disk", { number, style: style ?? "GPT" }),
+  openVolume: (letter: string) => invoke<string>("open_volume", { letter }),
+  scanBloatware: () => invoke<BloatScanResult>("scan_bloatware"),
+  removeBloatItems: (ids: string[]) =>
+    invoke<{ id: string; ok: boolean; message: string }[]>("remove_bloat_items", { ids }),
 };

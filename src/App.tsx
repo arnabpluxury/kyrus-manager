@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api } from "./lib/api";
+import { usePrefs } from "./lib/prefs";
 import { useTelemetry } from "./lib/telemetry";
 import type { AdminStatus, ViewId } from "./types";
 import { Button } from "./components/Button";
 import { Chip } from "./components/Chip";
 import { Icon, type IconName } from "./components/Icon";
+import { PrefsPanel } from "./components/PrefsPanel";
 import OverviewView from "./views/Overview";
 import StorageView from "./views/Storage";
 import CleanupView from "./views/Cleanup";
@@ -23,6 +25,10 @@ import UsersView from "./views/Users";
 import ControlView from "./views/Control";
 import DiskAnalyzerView from "./views/DiskAnalyzer";
 import SystemToolsView from "./views/SystemTools";
+import AdminConsoleView from "./views/AdminConsole";
+import DiskManagerView from "./views/DiskManager";
+import DevicesView from "./views/Devices";
+import BloatwareView from "./views/Bloatware";
 import "./App.css";
 
 type AppWindow = {
@@ -55,6 +61,10 @@ const NAV: { id: ViewId; label: string; group: string; icon: IconName }[] = [
   { id: "scheduler", label: "Task Scheduler", group: "System", icon: "scheduler" },
   { id: "firewall", label: "Firewall", group: "System", icon: "firewall" },
   { id: "network", label: "Network", group: "System", icon: "network" },
+  { id: "adminConsole", label: "Admin Console", group: "System", icon: "control" },
+  { id: "diskManager", label: "Disk Management", group: "System", icon: "drive" },
+  { id: "devices", label: "Device Manager", group: "System", icon: "display" },
+  { id: "bloatware", label: "Bloatware Free", group: "System", icon: "cleanup" },
   { id: "systemTools", label: "System Tools", group: "System", icon: "control" },
   { id: "control", label: "Control Center", group: "System", icon: "control" },
 ];
@@ -65,6 +75,7 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [clock, setClock] = useState(() => new Date());
   const { perf } = useTelemetry();
+  const prefs = usePrefs();
 
   const notify = useCallback((msg: string) => {
     setToast(msg);
@@ -112,6 +123,12 @@ export default function App() {
               CPU {perf.cpuUsage.toFixed(0)}% · RAM {memPct.toFixed(0)}%
             </Chip>
           )}
+          <Button className="compact" onClick={() => prefs.setOpen(true)}>
+            Preferences
+          </Button>
+          <Button className="compact" onClick={() => prefs.toggleTheme()}>
+            {prefs.theme === "light" ? "Dark" : "Light"}
+          </Button>
           {!admin?.elevated && (
             <Button
               className="compact"
@@ -188,6 +205,10 @@ export default function App() {
           {view === "firewall" && <FirewallView notify={notify} />}
           {view === "network" && <NetworkView notify={notify} />}
           {view === "users" && <UsersView notify={notify} />}
+          {view === "adminConsole" && <AdminConsoleView notify={notify} onNavigate={setView} />}
+          {view === "diskManager" && <DiskManagerView notify={notify} />}
+          {view === "devices" && <DevicesView notify={notify} />}
+          {view === "bloatware" && <BloatwareView notify={notify} />}
           {view === "systemTools" && <SystemToolsView notify={notify} />}
           {view === "control" && <ControlView notify={notify} />}
           </main>
@@ -202,6 +223,7 @@ export default function App() {
         </div>
       </div>
 
+      <PrefsPanel />
       {toast && <div className="toast">{toast}</div>}
     </div>
   );

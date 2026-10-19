@@ -12,12 +12,18 @@ mod process;
 mod scheduler;
 mod services;
 mod startup;
+mod progress;
 mod storage;
 mod system_extra;
 mod treemap;
 mod users;
+mod winmgmt;
+mod bloatware;
+mod shellutil;
 
 use models::*;
+use progress::ProgressEmitter;
+use tauri::AppHandle;
 
 #[tauri::command]
 fn get_admin_status() -> AdminStatus {
@@ -35,27 +41,79 @@ fn list_drives() -> Vec<DriveInfo> {
 }
 
 #[tauri::command]
-fn scan_storage(options: ScanOptions) -> Result<StorageScanResult, String> {
-    storage::scan_storage(options)
+async fn scan_storage(app: AppHandle, options: ScanOptions) -> Result<StorageScanResult, String> {
+    let emitter = ProgressEmitter::new(app, "storage");
+    tauri::async_runtime::spawn_blocking(move || {
+        storage::scan_storage_with_progress(options, Some(&emitter))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn find_largest_files(root: String, limit: Option<usize>, min_size_bytes: Option<u64>) -> Result<Vec<storage::LargeFile>, String> {
-    storage::find_largest_files(
-        &root,
-        limit.unwrap_or(200),
-        min_size_bytes.unwrap_or(50 * 1024 * 1024),
-    )
+async fn find_largest_files(
+    app: AppHandle,
+    root: String,
+    limit: Option<usize>,
+    min_size_bytes: Option<u64>,
+) -> Result<Vec<storage::LargeFile>, String> {
+    let emitter = ProgressEmitter::new(app, "largest");
+    let lim = limit.unwrap_or(200);
+    let min = min_size_bytes.unwrap_or(50 * 1024 * 1024);
+    tauri::async_runtime::spawn_blocking(move || {
+        storage::find_largest_files_with_progress(&root, lim, min, Some(&emitter))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn delete_paths(paths: Vec<String>) -> DeleteResult {
-    storage::delete_paths(paths)
+async fn build_treemap(
+    app: AppHandle,
+    root: String,
+    max_children: Option<usize>,
+    max_depth: Option<usize>,
+) -> Result<TreemapNode, String> {
+    let emitter = ProgressEmitter::new(app, "treemap");
+    let mc = max_children.unwrap_or(24);
+    let md = max_depth.unwrap_or(2);
+    tauri::async_runtime::spawn_blocking(move || {
+        emitter.emit("mapping", &root, 0, 0, 0, true);
+        let result = treemap::build_treemap(&root, mc, md);
+        if result.is_ok() {
+            emitter.finish("Treemap ready");
+        }
+        result
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn discover_temp() -> Vec<TempCandidate> {
-    cleanup::discover_temp()
+async fn delete_paths(app: AppHandle, paths: Vec<String>) -> DeleteResult {
+    let emitter = ProgressEmitter::new(app, "delete");
+    tauri::async_runtime::spawn_blocking(move || {
+        storage::delete_paths_with_progress(paths, Some(&emitter))
+    })
+    .await
+    .unwrap_or(DeleteResult {
+        deleted: vec![],
+        failed: vec![],
+        freed_bytes: 0,
+    })
+}
+
+#[tauri::command]
+async fn discover_temp(app: AppHandle) -> Vec<TempCandidate> {
+    let emitter = ProgressEmitter::new(app, "cleanup");
+    tauri::async_runtime::spawn_blocking(move || {
+        emitter.emit("scanning", "Temp & junk locations", 0, 0, 0, true);
+        let rows = cleanup::discover_temp();
+        emitter.finish(&format!("{} candidates", rows.len()));
+        rows
+    })
+    .await
+    .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -131,11 +189,6 @@ fn control_catalog() -> Vec<control::ControlAction> {
 #[tauri::command]
 fn run_control_action(id: String) -> Result<String, String> {
     control::run_action(&id)
-}
-
-#[tauri::command]
-fn build_treemap(root: String, max_children: Option<usize>, max_depth: Option<usize>) -> Result<TreemapNode, String> {
-    treemap::build_treemap(&root, max_children.unwrap_or(24), max_depth.unwrap_or(2))
 }
 
 #[tauri::command]
@@ -228,6 +281,113 @@ fn reveal_in_explorer(path: String) -> Result<String, String> {
     system_extra::reveal_in_explorer(&path)
 }
 
+#[tauri::command]
+fn kill_process_tree(pid: u32) -> Result<(), String> {
+    process::kill_process_tree(pid)
+}
+
+#[tauri::command]
+fn suspend_process(pid: u32) -> Result<(), String> {
+    process::suspend_process(pid)
+}
+
+#[tauri::command]
+fn resume_process(pid: u32) -> Result<(), String> {
+    process::resume_process(pid)
+}
+
+#[tauri::command]
+fn disk_inventory() -> Result<winmgmt::DiskInventory, String> {
+    winmgmt::disk_inventory()
+}
+
+#[tauri::command]
+fn set_disk_online(number: i32, online: bool) -> Result<String, String> {
+    winmgmt::set_disk_online(number, online)
+}
+
+#[tauri::command]
+fn set_disk_readonly(number: i32, read_only: bool) -> Result<String, String> {
+    winmgmt::set_disk_readonly(number, read_only)
+}
+
+#[tauri::command]
+fn list_devices(class: Option<String>) -> Result<Vec<winmgmt::DeviceEntry>, String> {
+    winmgmt::list_devices(class)
+}
+
+#[tauri::command]
+fn set_device_enabled(instance_id: String, enable: bool) -> Result<String, String> {
+    winmgmt::set_device_enabled(&instance_id, enable)
+}
+
+#[tauri::command]
+fn system_about() -> Result<winmgmt::SystemAbout, String> {
+    winmgmt::system_about()
+}
+
+#[tauri::command]
+fn list_event_log(
+    log: Option<String>,
+    limit: Option<usize>,
+    level: Option<String>,
+) -> Result<Vec<winmgmt::EventLogEntry>, String> {
+    winmgmt::list_events(
+        log.as_deref().unwrap_or("System"),
+        limit.unwrap_or(120),
+        level,
+    )
+}
+
+#[tauri::command]
+fn set_adapter_enabled(name: String, enable: bool) -> Result<String, String> {
+    winmgmt::set_adapter_enabled(&name, enable)
+}
+
+#[tauri::command]
+fn rescan_disks() -> Result<String, String> {
+    winmgmt::rescan_disks()
+}
+
+#[tauri::command]
+fn assign_drive_letter(
+    disk_number: i32,
+    partition_number: i32,
+    letter: String,
+) -> Result<String, String> {
+    winmgmt::assign_drive_letter(disk_number, partition_number, &letter)
+}
+
+#[tauri::command]
+fn remove_drive_letter(disk_number: i32, partition_number: i32) -> Result<String, String> {
+    winmgmt::remove_drive_letter(disk_number, partition_number)
+}
+
+#[tauri::command]
+fn initialize_disk(number: i32, style: Option<String>) -> Result<String, String> {
+    winmgmt::initialize_disk(number, style.as_deref().unwrap_or("GPT"))
+}
+
+#[tauri::command]
+fn open_volume(letter: String) -> Result<String, String> {
+    winmgmt::open_volume(&letter)
+}
+
+#[tauri::command]
+async fn scan_bloatware(app: AppHandle) -> Result<bloatware::BloatScanResult, String> {
+    let emitter = ProgressEmitter::new(app, "bloatware");
+    tauri::async_runtime::spawn_blocking(move || bloatware::scan_bloatware(Some(&emitter)))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn remove_bloat_items(ids: Vec<String>) -> Vec<bloatware::BloatRemoveResult> {
+    tauri::async_runtime::spawn_blocking(move || bloatware::remove_bloat_items(ids))
+        .await
+        .unwrap_or_default()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Release builds always elevate (UAC). Debug/`tauri dev` stays asInvoker so
@@ -299,6 +459,24 @@ pub fn run() {
             set_power_plan,
             recent_system_errors,
             reveal_in_explorer,
+            kill_process_tree,
+            suspend_process,
+            resume_process,
+            disk_inventory,
+            set_disk_online,
+            set_disk_readonly,
+            list_devices,
+            set_device_enabled,
+            system_about,
+            list_event_log,
+            set_adapter_enabled,
+            rescan_disks,
+            assign_drive_letter,
+            remove_drive_letter,
+            initialize_disk,
+            open_volume,
+            scan_bloatware,
+            remove_bloat_items,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Kyrus Manager");

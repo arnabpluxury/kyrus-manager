@@ -10,6 +10,8 @@ src-tauri/target/
 !.vscode/extensions.json
 .idea/
 *.local
+.cursor/
 docs/app-shots/*.png
 !docs/figma-refs/
+!docs/readme/
 src-tauri/icons/icon-256.png

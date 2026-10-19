@@ -1,5 +1,4 @@
 use serde::Serialize;
-use std::process::Command;
 use sysinfo::Networks;
 
 #[derive(Debug, Clone, Serialize)]
@@ -38,10 +37,7 @@ pub fn list_adapters() -> Vec<NetworkAdapter> {
 }
 
 pub fn ipconfig_all() -> Result<Vec<IpConfigEntry>, String> {
-    let output = Command::new("ipconfig")
-        .args(["/all"])
-        .output()
-        .map_err(|e| e.to_string())?;
+    let output = crate::shellutil::run_hidden("ipconfig", &["/all"])?;
     let text = String::from_utf8_lossy(&output.stdout);
     let mut entries = Vec::new();
     let mut current_name = String::from("General");
@@ -72,11 +68,8 @@ pub fn ipconfig_all() -> Result<Vec<IpConfigEntry>, String> {
 }
 
 pub fn release_renew() -> Result<String, String> {
-    let _ = Command::new("ipconfig").args(["/release"]).status();
-    let status = Command::new("ipconfig")
-        .args(["/renew"])
-        .status()
-        .map_err(|e| e.to_string())?;
+    let _ = crate::shellutil::status_hidden("ipconfig", &["/release"]);
+    let status = crate::shellutil::status_hidden("ipconfig", &["/renew"])?;
     if status.success() {
         Ok("IP release/renew completed".into())
     } else {

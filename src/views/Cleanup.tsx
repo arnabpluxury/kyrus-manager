@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { useBusy } from "../lib/busy";
 import { formatBytes } from "../lib/format";
 import type { SpacePrediction, TempCandidate } from "../types";
 import { Button } from "../components/Button";
@@ -19,9 +20,12 @@ export default function CleanupView({ notify }: Props) {
   const [safeOnly, setSafeOnly] = useState(true);
   const [prediction, setPrediction] = useState<SpacePrediction | null>(null);
   const { ask, modal } = useConfirm();
+  const busy = useBusy();
 
   const load = async () => {
+    if (loading) return;
     setLoading(true);
+    busy.begin("cleanup", "Temp & junk scan");
     try {
       const list = await api.discoverTemp();
       setItems(list);
@@ -29,6 +33,7 @@ export default function CleanupView({ notify }: Props) {
     } catch (e) {
       notify(String(e));
     } finally {
+      busy.end("cleanup");
       setLoading(false);
     }
   };
@@ -66,12 +71,15 @@ export default function CleanupView({ notify }: Props) {
       confirmLabel: "Delete",
     });
     if (!ok) return;
+    busy.begin("delete", `Removing ${paths.length} temp item(s)`);
     try {
       const result = await api.deletePaths(paths);
       notify(`Cleanup freed ${formatBytes(result.freedBytes)}`);
       await load();
     } catch (e) {
       notify(String(e));
+    } finally {
+      busy.end("delete");
     }
   };
 

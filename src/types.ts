@@ -122,6 +122,9 @@ export type ServiceInfo = {
   status: string;
   startType: string;
   description?: string | null;
+  binaryPath?: string | null;
+  iconBase64?: string | null;
+  pid?: number | null;
 };
 
 export type StartupItem = {
@@ -232,6 +235,107 @@ export type UserSession = {
   logonTime: string;
 };
 
+export type PhysicalDisk = {
+  number: number;
+  friendlyName: string;
+  sizeBytes: number;
+  partitionStyle: string;
+  operationalStatus: string;
+  healthStatus: string;
+  busType: string;
+  isSystem: boolean;
+  isBoot: boolean;
+};
+
+export type DiskPartition = {
+  diskNumber: number;
+  partitionNumber: number;
+  driveLetter: string;
+  sizeBytes: number;
+  partitionType: string;
+  isSystem: boolean;
+  isBoot: boolean;
+  isActive: boolean;
+  gptType: string;
+};
+
+export type VolumeInfo = {
+  driveLetter: string;
+  label: string;
+  fileSystem: string;
+  sizeBytes: number;
+  freeBytes: number;
+  healthStatus: string;
+  driveType: string;
+};
+
+export type DiskInventory = {
+  disks: PhysicalDisk[];
+  partitions: DiskPartition[];
+  volumes: VolumeInfo[];
+};
+
+export type DeviceEntry = {
+  instanceId: string;
+  name: string;
+  class: string;
+  status: string;
+  present: boolean;
+  problem: string;
+  manufacturer: string;
+};
+
+export type SystemAbout = {
+  computerName: string;
+  userName: string;
+  osName: string;
+  osVersion: string;
+  osBuild: string;
+  manufacturer: string;
+  model: string;
+  processor: string;
+  totalMemoryBytes: number;
+  systemType: string;
+  biosVersion: string;
+  domain: string;
+  installDate: string;
+  lastBoot: string;
+};
+
+export type EventLogEntry = {
+  time: string;
+  level: string;
+  logName: string;
+  source: string;
+  eventId: string;
+  message: string;
+};
+
+export type BloatItem = {
+  id: string;
+  name: string;
+  kind: string;
+  publisher: string;
+  version: string;
+  sizeBytes: number;
+  reason: string;
+  severity: string;
+  removable: boolean;
+  provisioned: boolean;
+  path: string;
+  details: string;
+};
+
+export type BloatScanResult = {
+  items: BloatItem[];
+  scannedPackages: number;
+  threatCount: number;
+  bloatCount: number;
+  reclaimableBytes: number;
+  elevated: boolean;
+  notes: string[];
+};
+
 export type ViewId =
   | "overview"
   | "storage"
@@ -249,4 +353,8 @@ export type ViewId =
   | "firewall"
   | "network"
   | "systemTools"
+  | "adminConsole"
+  | "diskManager"
+  | "devices"
+  | "bloatware"
   | "control";

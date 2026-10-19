@@ -53,28 +53,61 @@ export default function NetworkView({ notify }: Props) {
         <Button variant="danger" onClick={renew}>
           Release / Renew
         </Button>
-        <Button onClick={() => api.runControl("ncpa").then(notify).catch((e) => notify(String(e)))}>
-          Connections
+        <Button onClick={() => api.runControl("winx-ncpa").then(notify).catch((e) => notify(String(e)))}>
+          Connections (Win+X)
         </Button>
       </ViewHead>
 
       <div className="grid-cards">
         {adapters.map((a) => (
-          <StatCard
-            key={a.name}
-            label="Adapter"
-            value={a.name}
-            icon={<Icon name="networkNodes" size={18} />}
-            sub={
-              <>
-                ↓ {formatBytes(a.receivedBytes)} · ↑ {formatBytes(a.transmittedBytes)}
-                <br />
-                Packets {a.packetsReceived} / {a.packetsTransmitted}
-                <br />
-                Errors {a.errorsOnReceived} / {a.errorsOnTransmitted}
-              </>
-            }
-          />
+          <div key={a.name} className="stat-card panel">
+            <StatCard
+              plain
+              label="Adapter"
+              value={a.name}
+              icon={<Icon name="networkNodes" size={18} />}
+              sub={
+                <>
+                  ↓ {formatBytes(a.receivedBytes)} · ↑ {formatBytes(a.transmittedBytes)}
+                  <br />
+                  Packets {a.packetsReceived} / {a.packetsTransmitted}
+                  <br />
+                  Errors {a.errorsOnReceived} / {a.errorsOnTransmitted}
+                </>
+              }
+            />
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <Button
+                className="compact"
+                onClick={async () => {
+                  const ok = await ask({
+                    title: "Enable adapter",
+                    message: `Enable network adapter “${a.name}”?`,
+                    confirmLabel: "Enable",
+                  });
+                  if (!ok) return;
+                  api.setAdapterEnabled(a.name, true).then(notify).then(load).catch((e) => notify(String(e)));
+                }}
+              >
+                Enable
+              </Button>
+              <Button
+                className="compact"
+                variant="danger"
+                onClick={async () => {
+                  const ok = await ask({
+                    title: "Disable adapter",
+                    message: `Disable “${a.name}”? You may lose connectivity.`,
+                    confirmLabel: "Disable",
+                  });
+                  if (!ok) return;
+                  api.setAdapterEnabled(a.name, false).then(notify).then(load).catch((e) => notify(String(e)));
+                }}
+              >
+                Disable
+              </Button>
+            </div>
+          </div>
         ))}
       </div>
 

@@ -1,5 +1,4 @@
 use serde::Serialize;
-use std::process::Command;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -39,21 +38,10 @@ pub struct NvidiaGpu {
 }
 
 pub fn list_gpus() -> Vec<GpuInfo> {
-    let output = Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-Command",
-            "Get-CimInstance Win32_VideoController | Select-Object Name,AdapterRAM,DriverVersion,DriverDate,VideoProcessor,Status,PNPDeviceID | ConvertTo-Json -Compress",
-        ])
-        .output();
-
-    let Ok(out) = output else {
-        return vec![];
-    };
-    if !out.status.success() {
-        return vec![];
-    }
-    let text = String::from_utf8_lossy(&out.stdout);
+    let text = crate::shellutil::powershell_json(
+        "Get-CimInstance Win32_VideoController | Select-Object Name,AdapterRAM,DriverVersion,DriverDate,VideoProcessor,Status,PNPDeviceID | ConvertTo-Json -Compress",
+    )
+    .unwrap_or_default();
     parse_wmi_gpus(&text)
 }
 
@@ -122,19 +110,21 @@ fn detect_vendor(name: &str, pnp: Option<&str>) -> String {
 }
 
 pub fn nvidia_snapshot() -> NvidiaSnapshot {
-    let output = Command::new("nvidia-smi")
-        .args([
+    let out = match crate::shellutil::run_hidden(
+        "nvidia-smi",
+        &[
             "--query-gpu=index,name,utilization.gpu,utilization.memory,memory.total,memory.used,temperature.gpu,power.draw,power.limit,fan.speed,clocks.current.graphics",
             "--format=csv,noheader,nounits",
-        ])
-        .output();
-
-    let Ok(out) = output else {
-        return NvidiaSnapshot {
-            available: false,
-            raw: "nvidia-smi not found".into(),
-            gpus: vec![],
-        };
+        ],
+    ) {
+        Ok(o) => o,
+        Err(_) => {
+            return NvidiaSnapshot {
+                available: false,
+                raw: "nvidia-smi not found".into(),
+                gpus: vec![],
+            };
+        }
     };
     let raw = String::from_utf8_lossy(&out.stdout).to_string();
     if !out.status.success() {

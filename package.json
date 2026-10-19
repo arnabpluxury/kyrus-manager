@@ -8,7 +8,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "tauri:clean-installers": "node scripts/clean-installers.mjs",
+    "tauri:build:fresh": "npm run tauri:clean-installers && tauri build"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",

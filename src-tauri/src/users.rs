@@ -1,5 +1,4 @@
 use serde::Serialize;
-use std::process::Command;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -13,11 +12,8 @@ pub struct UserSession {
 }
 
 pub fn list_sessions() -> Result<Vec<UserSession>, String> {
-    let output = Command::new("query")
-        .args(["user"])
-        .output()
-        .or_else(|_| Command::new("quser").output())
-        .map_err(|e| e.to_string())?;
+    let output = crate::shellutil::run_hidden("query", &["user"])
+        .or_else(|_| crate::shellutil::run_hidden("quser", &[]))?;
 
     // quser writes to stdout even when "success"; sometimes stderr has data on non-English
     let text = if output.stdout.is_empty() {
@@ -62,10 +58,7 @@ pub fn list_sessions() -> Result<Vec<UserSession>, String> {
 }
 
 pub fn list_local_users() -> Result<Vec<String>, String> {
-    let output = Command::new("net")
-        .args(["user"])
-        .output()
-        .map_err(|e| e.to_string())?;
+    let output = crate::shellutil::run_hidden("net", &["user"])?;
     let text = String::from_utf8_lossy(&output.stdout);
     let mut users = Vec::new();
     let mut capture = false;

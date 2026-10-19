@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { useBusy } from "../lib/busy";
 import { formatBytes } from "../lib/format";
 import type { DriveInfo, LargeFile } from "../types";
 import { Button } from "../components/Button";
@@ -17,6 +18,7 @@ export default function DiskAnalyzerView({ notify }: Props) {
   const [limit, setLimit] = useState("200");
   const [files, setFiles] = useState<LargeFile[]>([]);
   const [loading, setLoading] = useState(false);
+  const busy = useBusy();
 
   useEffect(() => {
     api.drives().then((d) => {
@@ -26,7 +28,9 @@ export default function DiskAnalyzerView({ notify }: Props) {
   }, []);
 
   const scan = async () => {
+    if (loading) return;
     setLoading(true);
+    busy.begin("largest", "Disk analyzer");
     try {
       const rows = await api.largestFiles(
         root,
@@ -38,6 +42,7 @@ export default function DiskAnalyzerView({ notify }: Props) {
     } catch (e) {
       notify(String(e));
     } finally {
+      busy.end("largest");
       setLoading(false);
     }
   };
@@ -106,7 +111,6 @@ export default function DiskAnalyzerView({ notify }: Props) {
           {!files.length && !loading && (
             <div className="empty">Run a scan to list the heaviest files on this volume.</div>
           )}
-          {loading && <div className="empty">Full-tree walk in progress — please wait…</div>}
         </div>
       </Panel>
     </div>

@@ -1,5 +1,4 @@
 use serde::Serialize;
-use std::process::Command;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -21,10 +20,7 @@ pub struct FirewallRule {
 }
 
 pub fn list_profiles() -> Result<Vec<FirewallProfile>, String> {
-    let output = Command::new("netsh")
-        .args(["advfirewall", "show", "allprofiles"])
-        .output()
-        .map_err(|e| e.to_string())?;
+    let output = crate::shellutil::run_hidden("netsh", &["advfirewall", "show", "allprofiles"])?;
     let text = String::from_utf8_lossy(&output.stdout);
     Ok(parse_profiles(&text))
 }
@@ -72,10 +68,8 @@ fn parse_profiles(text: &str) -> Vec<FirewallProfile> {
 }
 
 pub fn list_rules(limit: usize) -> Result<Vec<FirewallRule>, String> {
-    let output = Command::new("netsh")
-        .args(["advfirewall", "firewall", "show", "rule", "name=all"])
-        .output()
-        .map_err(|e| e.to_string())?;
+    let output =
+        crate::shellutil::run_hidden("netsh", &["advfirewall", "firewall", "show", "rule", "name=all"])?;
     let text = String::from_utf8_lossy(&output.stdout);
     let mut rules = Vec::new();
     let mut cur = FirewallRule {
@@ -127,10 +121,10 @@ pub fn set_profile_state(profile: &str, enable: bool) -> Result<String, String> 
         "all" => "allprofiles",
         _ => return Err("Profile must be domain, private, public, or all".into()),
     };
-    let status = Command::new("netsh")
-        .args(["advfirewall", "set", profile_arg, "state", state])
-        .status()
-        .map_err(|e| e.to_string())?;
+    let status = crate::shellutil::status_hidden(
+        "netsh",
+        &["advfirewall", "set", profile_arg, "state", state],
+    )?;
     if status.success() {
         Ok(format!("Firewall {profile_arg} set to {state}"))
     } else {

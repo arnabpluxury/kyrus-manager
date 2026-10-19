@@ -1,5 +1,4 @@
 use serde::Serialize;
-use std::process::Command;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,10 +14,7 @@ pub struct ScheduledTask {
 }
 
 pub fn list_tasks(limit: usize) -> Result<Vec<ScheduledTask>, String> {
-    let output = Command::new("schtasks")
-        .args(["/Query", "/FO", "CSV", "/V"])
-        .output()
-        .map_err(|e| e.to_string())?;
+    let output = crate::shellutil::run_hidden("schtasks", &["/Query", "/FO", "CSV", "/V"])?;
     if !output.status.success() {
         return Err(String::from_utf8_lossy(&output.stderr).to_string());
     }
@@ -89,10 +85,7 @@ fn split_csv(line: &str) -> Vec<String> {
 }
 
 pub fn run_task(name: &str) -> Result<String, String> {
-    let status = Command::new("schtasks")
-        .args(["/Run", "/TN", name])
-        .status()
-        .map_err(|e| e.to_string())?;
+    let status = crate::shellutil::status_hidden("schtasks", &["/Run", "/TN", name])?;
     if status.success() {
         Ok(format!("Started task {name}"))
     } else {
@@ -101,10 +94,7 @@ pub fn run_task(name: &str) -> Result<String, String> {
 }
 
 pub fn end_task(name: &str) -> Result<String, String> {
-    let status = Command::new("schtasks")
-        .args(["/End", "/TN", name])
-        .status()
-        .map_err(|e| e.to_string())?;
+    let status = crate::shellutil::status_hidden("schtasks", &["/End", "/TN", name])?;
     if status.success() {
         Ok(format!("Ended task {name}"))
     } else {
@@ -114,10 +104,7 @@ pub fn end_task(name: &str) -> Result<String, String> {
 
 pub fn change_task(name: &str, enable: bool) -> Result<String, String> {
     let flag = if enable { "/ENABLE" } else { "/DISABLE" };
-    let status = Command::new("schtasks")
-        .args(["/Change", "/TN", name, flag])
-        .status()
-        .map_err(|e| e.to_string())?;
+    let status = crate::shellutil::status_hidden("schtasks", &["/Change", "/TN", name, flag])?;
     if status.success() {
         Ok(format!(
             "{} task {name}",

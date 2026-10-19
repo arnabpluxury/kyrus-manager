@@ -8,6 +8,7 @@ import { ViewHead } from "../components/ViewHead";
 type Props = { notify: (m: string) => void };
 
 const GROUP_ORDER = [
+  "Win+X",
   "Settings",
   "Hardware",
   "Security",

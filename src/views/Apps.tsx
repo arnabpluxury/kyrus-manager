@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
+import { useBusy } from "../lib/busy";
 import { formatBytes } from "../lib/format";
 import type { InstalledApp, SpacePrediction } from "../types";
 import { Button } from "../components/Button";
@@ -20,6 +21,7 @@ export default function AppsView({ notify }: Props) {
   const [autoAdvance, setAutoAdvance] = useState(true);
   const [prediction, setPrediction] = useState<SpacePrediction | null>(null);
   const { ask, modal } = useConfirm();
+  const busy = useBusy();
 
   const load = async () => {
     setLoading(true);
@@ -73,6 +75,7 @@ export default function AppsView({ notify }: Props) {
       confirmLabel: "Uninstall",
     });
     if (!ok) return;
+    busy.begin("uninstall", `Uninstalling ${ids.length} app(s)`);
     try {
       const results = await api.uninstallApps(ids, quiet, autoAdvance);
       const okCount = results.filter((r) => r.started).length;
@@ -80,6 +83,8 @@ export default function AppsView({ notify }: Props) {
       setTimeout(() => void load(), 4000);
     } catch (e) {
       notify(String(e));
+    } finally {
+      busy.end("uninstall");
     }
   };
 

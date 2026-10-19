@@ -57,6 +57,15 @@ pub fn catalog() -> Vec<ControlAction> {
         a("settings-optional", "Optional features", "ms-settings:optionalfeatures", "Settings"),
         a("settings-recovery", "Recovery", "ms-settings:recovery", "Settings"),
         a("settings-troubleshoot", "Troubleshoot", "ms-settings:troubleshoot", "Settings"),
+        // Win+X Power User menu (REA: Taskmgr + dmdskmgr + *.msc) — also in-app under Admin Console
+        a("winx-power", "Power Options (Win+X)", "powercfg.cpl — plans, sleep, lid", "Win+X"),
+        a("winx-events", "Event Viewer (Win+X)", "eventvwr.msc — System/App/Security", "Win+X"),
+        a("winx-system", "System (Win+X)", "ms-settings:about — PC specs", "Win+X"),
+        a("winx-devices", "Device Manager (Win+X)", "devmgmt.msc — drivers & PnP", "Win+X"),
+        a("winx-ncpa", "Network Connections (Win+X)", "ncpa.cpl — adapters", "Win+X"),
+        a("winx-disk", "Disk Management (Win+X)", "diskmgmt.msc — volumes & partitions", "Win+X"),
+        a("winx-compmgmt", "Computer Management (Win+X)", "compmgmt.msc — admin console", "Win+X"),
+        a("taskmgr", "Task Manager", "taskmgr.exe — processes & efficiency", "Win+X"),
         // Hardware / MMC (REA: mmc.exe hosts snap-ins)
         a("device-manager", "Device Manager", "devmgmt.msc", "Hardware"),
         a("disk-mgmt", "Disk Management", "diskmgmt.msc", "Hardware"),
@@ -155,9 +164,14 @@ pub fn run_action(id: &str) -> Result<String, String> {
         "settings-troubleshoot" => open_uri("ms-settings:troubleshoot"),
         "devmode" => open_uri("ms-settings:developers"),
         "control-panel" => spawn("control", &[]),
-        "device-manager" => spawn("devmgmt.msc", &[]),
-        "disk-mgmt" => spawn("diskmgmt.msc", &[]),
-        "computer-mgmt" => spawn("compmgmt.msc", &[]),
+        "device-manager" | "winx-devices" => spawn("devmgmt.msc", &[]),
+        "disk-mgmt" | "winx-disk" => spawn("diskmgmt.msc", &[]),
+        "computer-mgmt" | "winx-compmgmt" => spawn("compmgmt.msc", &[]),
+        "winx-power" => spawn("powercfg.cpl", &[]),
+        "winx-events" | "event-viewer" => spawn("eventvwr.msc", &[]),
+        "winx-system" => open_uri("ms-settings:about"),
+        "winx-ncpa" => spawn("ncpa.cpl", &[]),
+        "taskmgr" => spawn("taskmgr", &[]),
         "disk-defrag" => spawn("dfrgui", &[]),
         "print-mgmt" => spawn("printmanagement.msc", &[]),
         "firewall" => spawn("firewall.cpl", &[]),
@@ -166,7 +180,6 @@ pub fn run_action(id: &str) -> Result<String, String> {
         "gpedit" => spawn("gpedit.msc", &[]),
         "certmgr" => spawn("certmgr.msc", &[]),
         "credman" => spawn_cmd("control /name Microsoft.CredentialManager"),
-        "event-viewer" => spawn("eventvwr.msc", &[]),
         "resource-monitor" => spawn("resmon", &[]),
         "perfmon" => spawn("perfmon", &[]),
         "services-msc" => spawn("services.msc", &[]),
@@ -207,10 +220,7 @@ pub fn run_action(id: &str) -> Result<String, String> {
             Ok("Opened God Mode".into())
         }
         "flush-dns" => {
-            let output = Command::new("ipconfig")
-                .arg("/flushdns")
-                .output()
-                .map_err(|e| e.to_string())?;
+            let output = crate::shellutil::run_hidden("ipconfig", &["/flushdns"])?;
             if output.status.success() {
                 Ok("DNS cache flushed".into())
             } else {

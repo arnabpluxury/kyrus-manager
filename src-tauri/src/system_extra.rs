@@ -1,5 +1,6 @@
 //! Extra system-level helpers: environment, power plans, recent event errors.
 
+use crate::shellutil;
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 
@@ -53,10 +54,7 @@ pub fn list_env_vars() -> Vec<EnvVar> {
 }
 
 pub fn list_power_plans() -> Result<Vec<PowerPlan>, String> {
-    let output = Command::new("powercfg")
-        .args(["/list"])
-        .output()
-        .map_err(|e| e.to_string())?;
+    let output = shellutil::run_hidden("powercfg", &["/list"])?;
     let text = String::from_utf8_lossy(&output.stdout);
     let mut plans = Vec::new();
     for line in text.lines() {
@@ -83,10 +81,7 @@ pub fn list_power_plans() -> Result<Vec<PowerPlan>, String> {
 }
 
 pub fn set_power_plan(guid: &str) -> Result<String, String> {
-    let status = Command::new("powercfg")
-        .args(["/setactive", guid])
-        .status()
-        .map_err(|e| e.to_string())?;
+    let status = shellutil::status_hidden("powercfg", &["/setactive", guid])?;
     if status.success() {
         Ok(format!("Active power plan set to {guid}"))
     } else {
@@ -99,14 +94,7 @@ pub fn recent_errors(limit: usize) -> Result<Vec<EventEntry>, String> {
     let ps = format!(
         "Get-WinEvent -LogName System -MaxEvents {lim} -ErrorAction SilentlyContinue | Where-Object {{ $_.LevelDisplayName -match 'Error|Warning|Critical' }} | Select-Object -First {lim} | ForEach-Object {{ [PSCustomObject]@{{ Time=$_.TimeCreated.ToString('s'); Level=$_.LevelDisplayName; Source=$_.ProviderName; EventId=$_.Id; Message=($_.Message -replace '[\\r\\n]+',' ' ).Substring(0,[Math]::Min(240,$_.Message.Length)) }} }} | ConvertTo-Json -Compress"
     );
-    let output = Command::new("powershell")
-        .args(["-NoProfile", "-Command", &ps])
-        .output()
-        .map_err(|e| e.to_string())?;
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
-    }
-    let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let text = shellutil::powershell_json(&ps)?;
     if text.is_empty() || text == "null" {
         return Ok(vec![]);
     }

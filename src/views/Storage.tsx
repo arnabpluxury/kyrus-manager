@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
+import { useBusy } from "../lib/busy";
 import { formatBytes } from "../lib/format";
 import type { DriveInfo, SpacePrediction, StorageEntry, StorageScanResult } from "../types";
 import { Button } from "../components/Button";
@@ -25,6 +26,7 @@ export default function StorageView({ notify }: Props) {
   const [prediction, setPrediction] = useState<SpacePrediction | null>(null);
   const [pathStack, setPathStack] = useState<string[]>(["C:\\"]);
   const { ask, modal } = useConfirm();
+  const busy = useBusy();
 
   useEffect(() => {
     api.drives().then((d) => {
@@ -37,7 +39,9 @@ export default function StorageView({ notify }: Props) {
   }, []);
 
   const runScan = async (target = root, deepScan = deep) => {
+    if (loading) return;
     setLoading(true);
+    busy.begin("storage", deepScan ? "Deep storage scan" : "Quick storage scan");
     try {
       const result = await api.scanStorage({
         root: target,
@@ -55,10 +59,13 @@ export default function StorageView({ notify }: Props) {
       setPrediction(null);
       if (deepScan && result.totalScannedBytes < 1024 * 1024 * 1024) {
         notify("Deep scan finished — if totals still look small, elevate as Administrator and rescan.");
+      } else {
+        notify(`Scan done · ${formatBytes(result.totalScannedBytes)} in ${result.elapsedMs} ms`);
       }
     } catch (e) {
       notify(String(e));
     } finally {
+      busy.end("storage");
       setLoading(false);
     }
   };
@@ -105,12 +112,15 @@ export default function StorageView({ notify }: Props) {
       confirmLabel: "Delete",
     });
     if (!ok) return;
+    busy.begin("delete", `Removing ${paths.length} item(s)`);
     try {
       const result = await api.deletePaths(paths);
       notify(`Freed ${formatBytes(result.freedBytes)}; ${result.failed.length} failed`);
       await runScan(root);
     } catch (e) {
       notify(String(e));
+    } finally {
+      busy.end("delete");
     }
   };
 
@@ -312,7 +322,6 @@ export default function StorageView({ notify }: Props) {
             {!scan?.entries.length && !loading && (
               <div className="empty">No entries for this filter. Try Min MB = 0 and Deep sizes on.</div>
             )}
-            {loading && <div className="empty">Scanning recursively — large drives can take 1–3 minutes…</div>}
           </div>
           {scan && (
             <div className="foot-note">

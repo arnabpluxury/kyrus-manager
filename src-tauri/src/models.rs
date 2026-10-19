@@ -128,6 +128,9 @@ pub struct ServiceInfo {
     pub status: String,
     pub start_type: String,
     pub description: Option<String>,
+    pub binary_path: Option<String>,
+    pub icon_base64: Option<String>,
+    pub pid: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
